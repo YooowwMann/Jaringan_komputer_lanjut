@@ -1,0 +1,18 @@
+# Secrets & Configs
+.env
+bot_config.json
+
+# Cache & Runtime artifacts
+__pycache__/
+*.pyc
+receiver/__pycache__/
+receiver/latest_gps.json
+receiver/latest_frame.jpg
+
+# Virtual Environments & Models
+yolo-env/
+*.pt
+
+# IDE
+.vscode/
+.idea/

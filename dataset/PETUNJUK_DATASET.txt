@@ -1,0 +1,35 @@
+========================================================================
+           PETUNJUK PENGUMPULAN DATASET WAJAH UNTUK TUGAS GCS DRONE
+========================================================================
+
+Halo! Terima kasih sudah bantu bagian dataset pengenalan orang untuk proyek ini.
+Tugas kamu sangat mudah, cukup ikuti panduan berikut:
+
+1. KEBUTUHAN DATASET:
+   - Kita membutuhkan foto wajah untuk 2 ORANG tertentu (misal: Anggota 1 & Anggota 2).
+   - Setiap orang membutuhkan minimal 20 sampai 25 lembar foto wajah.
+
+2. TIPS PENGAMBILAN FOTO:
+   - Pencahayaan: Pastikan wajah terlihat jelas dan terang (jangan backlight / gelap).
+   - Jarak: Foto dari dada ke kepala/setengah badan (seperti foto paspor / selfie sedang).
+   - Variasi sudut:
+     * 7 foto menghadap lurus ke depan
+     * 4 foto agak serong ke kiri
+     * 4 foto agak serong ke kanan
+     * 3 foto sedikit mendongak ke atas
+     * 3 foto ekspresi tersenyum
+   - Resolusi: Bebas (kamera HP biasa sudah sangat bagus). Format .jpg atau .png.
+
+3. CARA MENYIMPAN:
+   - Masukkan foto Orang 1 ke folder: dataset/orang_1/
+   - Masukkan foto Orang 2 ke folder: dataset/orang_2/
+   (Catatan: Nama folder 'orang_1' dan 'orang_2' bisa diubah langsung menjadi nama asli
+   orangnya, contoh: 'dataset/Anjing/' dan 'dataset/Babi/').
+
+4. SETELAH FOTO DIKUMPULKAN:
+   - Kamu bisa kirim file zip foto ke grub kelompok, atau langsung jalankan
+     perintah berikut di terminal untuk melatih model secara instan (hanya 5 detik):
+     python train_faces.py (yang di kirim Ardi)
+
+Terima kasih atas bantuannya!
+========================================================================
