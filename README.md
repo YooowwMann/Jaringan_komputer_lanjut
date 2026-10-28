@@ -204,6 +204,6 @@ Laporan akademik resmi proyek ini dengan analisis teknis mendalam tersedia di fi
 ---
 
 ## 👥 Pengembang
-- **Kelompok:** Drone 1 GCS Team
+- **Kelompok:** 6
 - **Mata Kuliah:** Jaringan Komputer Lanjut
 - **Repository:** [https://github.com/YooowwMann/Jaringan_komputer_lanjut.git](https://github.com/YooowwMann/Jaringan_komputer_lanjut.git)
