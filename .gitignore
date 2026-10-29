@@ -13,6 +13,11 @@ receiver/latest_frame.jpg
 yolo-env/
 *.pt
 
+# Dataset photos (folder dataset tetap ada, isi foto diabaikan)
+dataset/*/*
+!dataset/PETUNJUK_DATASET.txt
+!dataset/.gitkeep
+
 # IDE
 .vscode/
 .idea/

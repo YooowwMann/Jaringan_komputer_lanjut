@@ -68,9 +68,9 @@ def train_model():
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             detected = face_cascade.detectMultiScale(
                 gray,
-                scaleFactor=1.1,
-                minNeighbors=4,
-                minSize=(60, 60)
+                scaleFactor=1.05,
+                minNeighbors=3,
+                minSize=(40, 40)
             )
 
             # Jika wajah terdeteksi, ambil crop wajah
@@ -80,19 +80,24 @@ def train_model():
                 (x, y, w, h) = detected[0]
                 face_crop = gray[y : y + h, x : x + w]
                 face_resized = cv2.resize(face_crop, (200, 200))
-                faces_data.append(face_resized)
+                # Normalisasi pencahayaan dengan Equalize Histogram agar tahan variasi cahaya
+                face_equalized = cv2.equalizeHist(face_resized)
+                faces_data.append(face_equalized)
                 labels_data.append(label_id)
-                faces_for_person += 1
-                total_images_processed += 1
-            else:
-                # Fallback jika crop gagal tapi gambar sudah berupa potret wajah rapat
-                face_resized = cv2.resize(gray, (200, 200))
-                faces_data.append(face_resized)
-                labels_data.append(label_id)
-                faces_for_person += 1
-                total_images_processed += 1
 
-        print(f"    -> Berhasil mengekstrak {faces_for_person} sampel wajah untuk '{person_name}'.")
+                # Augmentasi horizontal flip (mirroring) agar model tahan sudut pandang kiri & kanan
+                face_flipped = cv2.flip(face_equalized, 1)
+                faces_data.append(face_flipped)
+                labels_data.append(label_id)
+
+                faces_for_person += 2
+                total_images_processed += 2
+            else:
+                # PENTING: Jangan gunakan foto satu ruangan penuh karena akan mencemari LBPH!
+                # Lewati foto yang gagal dideteksi agar model tetap akurat
+                pass
+
+        print(f"    -> Berhasil mengekstrak {faces_for_person} sampel wajah valid untuk '{person_name}'.")
 
     if not faces_data:
         print("\n[!] Gagal: Tidak ada sampel wajah valid yang dapat diekstrak.")

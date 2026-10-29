@@ -3,6 +3,7 @@ import json
 import socket
 import struct
 import time
+import threading
 import numpy as np
 import cv2
 
@@ -62,60 +63,105 @@ def read_gps_cache():
     except Exception:
         return None
 
+# Ambang batas distance LBPH (jarak makin kecil makin mirip, <= 82 cocok untuk webcam -> HP IP camera)
+LBPH_DISTANCE_THRESHOLD = 82.0
+
+last_detected_boxes = []
+face_detect_counter = 0
+
+def save_snapshot_async(img_frame, filepath):
+    """Menyimpan snapshot frame ke disk secara asinkron di thread terpisah agar tidak memblokir socket UDP."""
+    def _worker():
+        try:
+            cv2.imwrite(filepath, img_frame)
+        except Exception:
+            pass
+    threading.Thread(target=_worker, daemon=True).start()
+
+def _draw_face_box(frame, x, y, w, h, color, label_text):
+    """Menggambar kotak deteksi wajah dan label nama."""
+    cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+    (tw, th), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+    bg_y1 = max(0, y - th - 8)
+    cv2.rectangle(frame, (x, bg_y1), (x + tw + 6, y), color, -1)
+    cv2.putText(
+        frame,
+        label_text,
+        (x + 3, max(th, y - 4)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.55,
+        (255, 255, 255),
+        2
+    )
+
 def process_face_recognition(frame):
     """
-    Mendeteksi wajah manusia:
-    - Jika cocok dengan Orang 1 / Orang 2: Bounding box HIJAU dengan Nama + Persentase.
+    Mendeteksi wajah manusia dengan akselerasi downscale (realtime) & toleransi LBPH terkalibrasi:
+    - Jika cocok dengan Orang di dataset: Bounding box HIJAU dengan Nama + Persentase.
     - Jika orang lain (orang asing / dosen): Bounding box MERAH dengan label [UNKNOWN].
     """
-    global recognizer, labels_map
+    global recognizer, labels_map, last_detected_boxes, face_detect_counter
     if recognizer is None or face_cascade.empty():
         return frame
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.15,
-        minNeighbors=5,
-        minSize=(50, 50)
+    face_detect_counter += 1
+    # Jalankan deteksi berat setiap 2 frame sekali untuk menghemat CPU & menjaga FPS tetap tinggi
+    if face_detect_counter % 2 == 1 and last_detected_boxes:
+        for (x, y, w, h, color, label_text) in last_detected_boxes:
+            _draw_face_box(frame, x, y, w, h, color, label_text)
+        return frame
+
+    h_orig, w_orig = frame.shape[:2]
+    # Downscale citra ke 50% (320x240) untuk deteksi super cepat (~10ms)
+    small_gray = cv2.cvtColor(
+        cv2.resize(frame, (w_orig // 2, h_orig // 2)),
+        cv2.COLOR_BGR2GRAY
     )
 
-    for (x, y, w, h) in faces:
-        face_roi = gray[y : y + h, x : x + w]
+    # Deteksi pada resolusi kecil (lebih sensitif dan jauh lebih cepat)
+    faces = face_cascade.detectMultiScale(
+        small_gray,
+        scaleFactor=1.1,
+        minNeighbors=4,
+        minSize=(25, 25)
+    )
+
+    full_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    new_detected_boxes = []
+
+    for (sx, sy, sw, sh) in faces:
+        # Skalakan kembali koordinat ke ukuran frame asli
+        x = max(0, sx * 2)
+        y = max(0, sy * 2)
+        w = min(w_orig - x, sw * 2)
+        h = min(h_orig - y, sh * 2)
+
+        face_roi = full_gray[y : y + h, x : x + w]
+        if face_roi.size == 0:
+            continue
+
         face_resized = cv2.resize(face_roi, (200, 200))
+        # Normalisasi histogram agar tahan variasi pencahayaan
+        face_eq = cv2.equalizeHist(face_resized)
 
         try:
-            label_id, distance = recognizer.predict(face_resized)
-            # Di LBPH: distance < 75.0 dianggap cocok (jarak makin kecil makin mirip)
-            if distance < 75.0 and label_id in labels_map:
+            label_id, distance = recognizer.predict(face_eq)
+            if distance <= LBPH_DISTANCE_THRESHOLD and label_id in labels_map:
                 name = labels_map[label_id]
                 color = (0, 255, 0)  # Hijau untuk orang yang dikenali
-                conf_pct = max(0, min(100, int(100 - (distance * 0.7))))
+                conf_pct = max(0, min(100, int(100 - (distance * 0.65))))
                 label_text = f"{name} ({conf_pct}%)"
             else:
-                name = "UNKNOWN"
                 color = (0, 0, 255)  # Merah untuk orang asing
                 label_text = "[UNKNOWN]"
         except Exception:
             color = (0, 0, 255)
             label_text = "[UNKNOWN]"
 
-        # Gambar bounding box kotak
-        cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-        # Background teks nama di atas kotak
-        (tw, th), _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
-        bg_y1 = max(0, y - th - 8)
-        cv2.rectangle(frame, (x, bg_y1), (x + tw + 6, y), color, -1)
-        cv2.putText(
-            frame,
-            label_text,
-            (x + 3, max(th, y - 4)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.55,
-            (255, 255, 255),
-            2
-        )
+        new_detected_boxes.append((x, y, w, h, color, label_text))
+        _draw_face_box(frame, x, y, w, h, color, label_text)
 
+    last_detected_boxes = new_detected_boxes
     return frame
 
 def draw_hud(frame, gps_data, current_fps):
@@ -267,13 +313,10 @@ def run_receiver():
                     # 3. Gambar Head-Up Display (HUD) telemetri di frame
                     hud_frame = draw_hud(frame, cached_gps, current_fps)
 
-                    # 4. Simpan snapshot frame terkini untuk Bot Telegram /photo
-                    if (now - last_snapshot_time) >= 0.3:
-                        try:
-                            cv2.imwrite(LATEST_FRAME_FILE, hud_frame)
-                            last_snapshot_time = now
-                        except Exception:
-                            pass
+                    # 4. Simpan snapshot frame terkini untuk Bot Telegram /photo (asinkron, zero-lag)
+                    if (now - last_snapshot_time) >= 0.5:
+                        save_snapshot_async(hud_frame, LATEST_FRAME_FILE)
+                        last_snapshot_time = now
 
                     # 5. Tampilkan frame di jendela OpenCV
                     cv2.imshow("GCS Video & Telemetry (Drone 1)", hud_frame)

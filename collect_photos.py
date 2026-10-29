@@ -60,20 +60,22 @@ def main():
 
         display_frame = frame.copy()
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, 1.2, 5, minSize=(60, 60))
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4, minSize=(60, 60))
 
         # Tampilkan kotak bantu deteksi wajah
         for (x, y, w, h) in faces:
-            cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 255), 2)
+            cv2.rectangle(display_frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         # Informasi di layar
+        status_face_text = f"Wajah: OK ({len(faces)})" if len(faces) > 0 else "Wajah: BELUM TERDETEKSI"
+        status_color = (0, 255, 0) if len(faces) > 0 else (0, 0, 255)
         cv2.putText(
             display_frame,
-            f"Nama: {safe_name} | Foto: {photo_count} | Wajah: {len(faces)}",
+            f"Nama: {safe_name} | Foto: {photo_count} | {status_face_text}",
             (15, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.65,
-            (0, 255, 0),
+            0.6,
+            status_color,
             2
         )
         if auto_burst:
@@ -110,10 +112,13 @@ def main():
                 auto_burst = False
 
         if should_save:
-            photo_count += 1
-            filename = os.path.join(target_dir, f"face_{int(now * 1000)}.jpg")
-            cv2.imwrite(filename, frame)
-            print(f"[+] Foto ke-{photo_count} tersimpan: {os.path.basename(filename)}")
+            if len(faces) > 0:
+                photo_count += 1
+                filename = os.path.join(target_dir, f"face_{int(now * 1000)}.jpg")
+                cv2.imwrite(filename, frame)
+                print(f"[+] Foto ke-{photo_count} tersimpan: {os.path.basename(filename)}")
+            else:
+                print("[-] Peringatan: Wajah tidak terdeteksi, foto dilewati agar dataset tidak rusak.")
 
     cap.release()
     cv2.destroyAllWindows()
